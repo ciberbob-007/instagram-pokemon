@@ -2,11 +2,24 @@ import {
   View,
   TouchableWithoutFeedback,
   Dimensions,
-  Pressable,
   ActivityIndicator,
   SafeAreaView,
+  PanResponder,
+  GestureResponderEvent,
+  PanResponderGestureState,
 } from 'react-native';
 import { styles } from './styles';
+import {
+  webContainerStyle,
+  webProgressRowStyle,
+  webStoryAreaStyle,
+  webImageStyle,
+  webLoaderStyle,
+  webInfoBlock,
+  webBadgeRow,
+  webBadge,
+  webAbilityBadge,
+} from './stylesweb';
 import { useRef, useEffect, useState } from 'react';
 import ProgressBar from '@/components/atoms/ProgressBar';
 import PokemonImage from '@/components/atoms/PokemonImage';
@@ -26,6 +39,7 @@ export default function PokemonStoryViewer({
 }) {
   const [loadingImage, setLoadingImage] = useState(true);
   const [current, setCurrent] = useState(0);
+  const [isSwipingDown, setIsSwipingDown] = useState(false);
   const [progress, setProgress] = useState(0);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -51,86 +65,170 @@ export default function PokemonStoryViewer({
   };
 }, [current, stories.length, onClose]);
 
-  const handleTap = (evt: any) => {
-  const { locationX } = evt.nativeEvent;
-  if (locationX < Dimensions.get('window').width / 2) {
-    // Tap izquierda
-    if (current > 0) {
-      ('TAP IZQUIERDA: retrocede');
-      setCurrent((prev) => prev - 1);
-    }
-  } else {
-    // Tap derecha
-    if (current < stories.length - 1) {
-      ('TAP DERECHA: avanza');
-      setCurrent((prev) => prev + 1);
-    } else {
-      ('TAP DERECHA: cerrar');
-      onClose();
-    }
-  }
-};
+  const panResponder = typeof document === 'undefined'
+    ? PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onPanResponderRelease: (evt: GestureResponderEvent, gestureState: PanResponderGestureState) => {
+          if (gestureState.dy > 70 && Math.abs(gestureState.dx) < 50) {
+            onClose();
+            return;
+          }
+          if (Math.abs(gestureState.dx) < 10 && Math.abs(gestureState.dy) < 10) {
+            const { locationX } = evt.nativeEvent;
+            if (locationX < Dimensions.get('window').width / 2) {
+              if (current > 0) {
+                setCurrent((prev) => prev - 1);
+              } else {
+                onClose();
+              }
+            } else {
+              if (current < stories.length - 1) {
+                setCurrent((prev) => prev + 1);
+              } else {
+                onClose();
+              }
+            }
+          }
+        },
+      })
+    : null;
+
+
 
   const story = stories[current];
 
+  const handleWebClick = (evt: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+    const boundingRect = (evt.target as HTMLDivElement).getBoundingClientRect();
+    const locationX = evt.clientX - boundingRect.left;
+    if (locationX < boundingRect.width / 2) {
+      if (current > 0) {
+        setCurrent((prev) => prev - 1);
+      } else {
+        onClose();
+      }
+    } else {
+      if (current < stories.length - 1) {
+        setCurrent((prev) => prev + 1);
+      } else {
+        onClose();
+      }
+    }
+  };
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#222' }}>
-      <TouchableWithoutFeedback onPress={handleTap}>
-        <View style={styles.container}>
-        <View style={styles.progressRow}>
-          {stories.map((_, idx) => (
-            <ProgressBar
-              key={idx + '-' + (idx === current ? progress.toFixed(3) : '')}
-              progress={
-                idx < current ? 1 : idx === current ? progress : 0
-              }
+      {typeof document !== 'undefined' ? (
+        (() => {
+          return (
+            <div style={webContainerStyle} onClick={handleWebClick}>
+              <div style={webProgressRowStyle}>
+                {stories.map((_, idx) => (
+                  <ProgressBar
+                    key={idx + '-' + (idx === current ? progress.toFixed(3) : '')}
+                    progress={
+                      idx < current ? 1 : idx === current ? progress : 0
+                    }
+                  />
+                ))}
+              </div>
+              <div style={webStoryAreaStyle}>
+                {loadingImage && (
+                  <div style={webLoaderStyle}>
+                    <ActivityIndicator size="large" color="#fff" />
+                  </div>
+                )}
+                <div style={{ display: loadingImage ? 'none' : 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <img
+                    src={story.image}
+                    alt={story.name}
+                    style={{ ...webImageStyle, opacity: loadingImage ? 0 : 1 }}
+                    onLoad={() => setLoadingImage(false)}
+                  />
+                  <div style={{ width: '100%' }}>
+                    <PokemonName name={story.name} />
+                  </div>
+                  <div style={webInfoBlock}>
+                    <ThemedText style={styles.infoLabel}>Type</ThemedText>
+                    <div style={webBadgeRow}>
+                      {story.types.map((type: string) => (
+                        <div key={type} style={webBadge}>
+                          <ThemedText style={styles.badgeText}>{type}</ThemedText>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={webInfoBlock}>
+                    <ThemedText style={styles.infoLabel}>Abilities</ThemedText>
+                    <div style={webBadgeRow}>
+                      {story.abilities.map((ab: string) => (
+                        <div key={ab} style={webAbilityBadge}>
+                          <ThemedText style={styles.abilityText}>{ab}</ThemedText>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()
+      ) : (
+        <View
+          style={styles.container}
+          {...(panResponder ? panResponder.panHandlers : {})}
+        >
+          <View style={styles.progressRow}>
+            {stories.map((_, idx) => (
+              <ProgressBar
+                key={idx + '-' + (idx === current ? progress.toFixed(3) : '')}
+                progress={
+                  idx < current ? 1 : idx === current ? progress : 0
+                }
+              />
+            ))}
+          </View>
+          <View style={styles.storyArea}>
+            {loadingImage && (
+              <View style={styles.loaderContainer}>
+                <ActivityIndicator size="large" color="#fff" />
+              </View>
+            )}
+            <PokemonImage
+              key={story.id}
+              uri={story.image}
+              style={[
+                styles.imageLarge,
+                styles.glow,
+                loadingImage ? { opacity: 0 } : { opacity: 1 },
+              ]}
+              containerStyle={{ marginBottom: 16 }}
+              onLoadStart={() => setLoadingImage(true)}
+              onLoadEnd={() => setLoadingImage(false)}
             />
-          ))}
-        </View>
-        <View style={styles.storyArea}>
-          {loadingImage && (
-            <View style={styles.loaderContainer}>
-              <ActivityIndicator size="large" color="#fff" />
+            <PokemonName name={story.name} />
+            <View style={styles.infoBlock}>
+              <ThemedText style={styles.infoLabel}>Type</ThemedText>
+              <View style={styles.badgeRowFull}>
+                {story.types.map((type: string) => (
+                  <View key={type} style={[styles.badge, { backgroundColor: 'rgba(255,255,255,0.15)' }]}> 
+                    <ThemedText style={styles.badgeText}>{type}</ThemedText>
+                  </View>
+                ))}
+              </View>
             </View>
-          )}
-          <PokemonImage
-            key={story.id}
-            uri={story.image}
-            style={[
-              styles.imageLarge,
-              styles.glow,
-              loadingImage ? { opacity: 0 } : { opacity: 1 },
-            ]}
-            onLoadStart={() => setLoadingImage(true)}
-            onLoadEnd={() => setLoadingImage(false)}
-          />
-          <ThemedText style={styles.pokemonName}>{story.name.toUpperCase()}</ThemedText>
-          <View style={styles.infoBlock}>
-            <ThemedText style={styles.infoLabel}>Type</ThemedText>
-            <View style={styles.badgeRowFull}>
-              {story.types.map((type: string) => (
-                <View key={type} style={[styles.badge, { backgroundColor: 'rgba(255,255,255,0.15)' }]}> 
-                  <ThemedText style={styles.badgeText}>{type}</ThemedText>
-                </View>
-              ))}
-            </View>
-          </View>
-          <View style={styles.infoBlock}>
-            <ThemedText style={styles.infoLabel}>Abilities</ThemedText>
-            <View style={styles.badgeRowFull}>
-              {story.abilities.map((ab: string) => (
-                <View key={ab} style={styles.abilityBadge}>
-                  <ThemedText style={styles.abilityText}>{ab}</ThemedText>
-                </View>
-              ))}
+            <View style={styles.infoBlock}>
+              <ThemedText style={styles.infoLabel}>Abilities</ThemedText>
+              <View style={styles.badgeRowFull}>
+                {story.abilities.map((ab: string) => (
+                  <View key={ab} style={styles.abilityBadge}>
+                    <ThemedText style={styles.abilityText}>{ab}</ThemedText>
+                  </View>
+                ))}
+              </View>
             </View>
           </View>
         </View>
-        <Pressable style={styles.closeBtn} onPress={onClose}>
-          <Ionicons name="close" size={32} color="#fff" />
-        </Pressable>
-      </View>
-    </TouchableWithoutFeedback>
+      )}
     </SafeAreaView>
   );
 }

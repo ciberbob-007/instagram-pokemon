@@ -6,6 +6,16 @@ export default function ProgressBar({
 }: {
   progress: number | Animated.Value;
 }) {
+  const isWeb = typeof document !== 'undefined';
+  if (isWeb) {
+    const { webProgressBarContainer, webProgressBarFill } = require('./stylesweb');
+    const prog = typeof progress === 'number' ? progress : 0;
+    return (
+      <div style={webProgressBarContainer}>
+        <div style={webProgressBarFill(prog)} />
+      </div>
+    );
+  }
   return (
     <View style={styles.progressBackground}>
       <Animated.View
